@@ -73,20 +73,25 @@ func (s *Server) handleCommand(conn net.Conn, rawCommand []byte) {
 	msg, err := parseMessage(rawCommand)
 	if err != nil {
 		fmt.Println("failed to parse command", err)
-		// respond
+		// respond - dump out the error
+		conn.Write([]byte(err.Error()))
 		return
 	}
 
 	switch msg.Cmd {
 
 	case CMDSet:
-		if err := s.handleSetCmd(conn, msg); err != nil {
-			// respond
-			return
-		}
+		err = s.handleSetCmd(conn, msg)
 
+	case CMDGet:
+		err = s.handleGetCmd(conn, msg)
 	}
 
+	if err != nil {
+		fmt.Println("failed to handle command:", err)
+		// respond - dump out the error
+		conn.Write([]byte(err.Error()))
+	}
 }
 
 func (s *Server) handleSetCmd(conn net.Conn, msg *Message) error {
@@ -100,6 +105,20 @@ func (s *Server) handleSetCmd(conn net.Conn, msg *Message) error {
 	go s.sentToFollowers(context.TODO(), msg)
 
 	return nil
+}
+
+func (s *Server) handleGetCmd(conn net.Conn, msg *Message) error {
+
+	fmt.Println("handling the GET command: ", msg)
+
+	val, err := s.cache.Get(msg.Key)
+	if err != nil {
+		return err
+	}
+
+	_, err = conn.Write(val)
+
+	return err
 }
 
 func (s *Server) sentToFollowers(ctx context.Context, msg *Message) error {
