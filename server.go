@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"distributedCache/cache"
 	"fmt"
 	"log"
@@ -63,7 +64,45 @@ func (s *Server) handleConn(conn net.Conn) {
 			log.Printf("conn read error: %s\n", err)
 		}
 
-		message := buf[:n]
-		fmt.Println(string(message))
+		go s.handleCommand(conn, buf[:n])
 	}
+}
+
+func (s *Server) handleCommand(conn net.Conn, rawCommand []byte) {
+
+	msg, err := parseMessage(rawCommand)
+	if err != nil {
+		fmt.Println("failed to parse command", err)
+		// respond
+		return
+	}
+
+	switch msg.Cmd {
+
+	case CMDSet:
+		if err := s.handleSetCmd(conn, msg); err != nil {
+			// respond
+			return
+		}
+
+	}
+
+}
+
+func (s *Server) handleSetCmd(conn net.Conn, msg *Message) error {
+
+	fmt.Println("handling the SET command: ", msg)
+
+	if err := s.cache.Set(msg.Key, msg.Value, msg.TTL); err != nil {
+		return err
+	}
+
+	go s.sentToFollowers(context.TODO(), msg)
+
+	return nil
+}
+
+func (s *Server) sentToFollowers(ctx context.Context, msg *Message) error {
+	// TODO: implement
+	return nil
 }
